@@ -27,7 +27,6 @@ def resize_image(img):      #returns numpy array
       return resized
 
 # --- Extracting Color Features --- #
-
 def extract_color_features(resized):  #returns hsv image
       hsv = cv2.cvtColor(resized, cv2.COLOR_BGR2HSV)  #Convert to HSV to ensure better comparison
       avg_hue = np.mean(hsv[:,:,0])                   #Calculate the average hue    
@@ -40,25 +39,67 @@ def extract_color_features(resized):  #returns hsv image
             "avg_value": avg_value  
       }
 
-# --- Testing the functions --- #
+# --- Healthy Thresholds --- #
 
+def healthy_thresholds():     #returns dict     
+
+      #Calculates average color features for healthy images
+
+      healthy_img1 = load_image("samples/Tomato_Healthy_1.jpeg")
+      healthy_img2 = load_image("samples/Tomato_Healthy_2.jpeg")
+      healthy_img3 = load_image("samples/Tomato_Healthy_3.jpeg")
+
+      healthy_resized1 = resize_image(healthy_img1)
+      healthy_resized2 = resize_image(healthy_img2)   
+      healthy_resized3 = resize_image(healthy_img3)
+
+      healthy_features1 = extract_color_features(healthy_resized1)
+      healthy_features2 = extract_color_features(healthy_resized2)
+      healthy_features3 = extract_color_features(healthy_resized3)
+
+      avg_healthy_features = {
+            "avg_hue": (healthy_features1["avg_hue"] + healthy_features2["avg_hue"] + healthy_features3["avg_hue"]) / 3,
+            "avg_saturation":(healthy_features1["avg_saturation"] + healthy_features2["avg_saturation"] + healthy_features3["avg_saturation"]) / 3,
+            "avg_value": (healthy_features1["avg_value"] + healthy_features2["avg_value"] + healthy_features3["avg_value"]) / 3
+      }
+
+      return avg_healthy_features
+
+
+# --- Comparing Features --- #      
+
+def compare_features(healthy, test):   #returns dict 
+      #calculates the difference between healthy and test images
+      return{
+            "hue_diff": healthy["avg_hue"] - test["avg_hue"],                       
+            "saturation_diff": healthy["avg_saturation"] - test["avg_saturation"],  
+            "value_diff": healthy["avg_value"] - test["avg_value"]
+      }
+
+
+# --- Classifying Features --- #
+def classification(differences): #returns string(temporary)        
+      if differences["hue_diff"] < -15:
+            return "Possible Deficiency Type 2"       #Example classification based on color features (rough values)
+      if differences["saturation_diff"] < -20:
+            return "Possible Deficiency Type 1"
+      if differences["value_diff"] > 10:
+            return "Possible Deficiency Type 3"
+      return "Healthy"
+      
+
+# --- Testing the new functions --- #
+
+avg_healthy = healthy_thresholds()
 path = "samples\Tomato_Bacterial_spot_1.jpeg"
-img = load_image(path)
-resized = resize_image(img)
-features = extract_color_features(resized)
+test_img = load_image(path)
+test_resized = resize_image(test_img)
+test_features = extract_color_features(test_resized)
+differences = compare_features(avg_healthy, test_features)
 
-cv2.imshow("Resized", resized)
-cv2.waitKey(2000)  
-cv2.destroyAllWindows()
+print(differences)
 
-cv2.imshow("Original", img)
-cv2.waitKey(2000)  
-cv2.destroyAllWindows()
-
-print("Extracted Color Features:")
-for key, value in features.items():
-      print(f"{key}: {value}")          
-
+     
 
 
 
