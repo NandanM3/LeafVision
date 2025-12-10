@@ -1,12 +1,11 @@
 import os           
-import sys          #Used to exit the program at certain points
-import glob         #Used to find file patterns     
+import sys          #Used to exit the program at certain points   
 import argparse     #Used for parsing the command line
 
 import cv2
 import numpy as np
 
-# --- Loading Image --- #
+# --- Loading Image --- 
 
 def load_image(path:str): #returns numpy array
       img = cv2.imread(path)
@@ -18,7 +17,7 @@ def load_image(path:str): #returns numpy array
 
 def resize_image(img):      #returns numpy array
       width = 600           #standard width we use  
-      h,w = img.shape[:2]   #extracts the hight and width only not channel
+      h,w = img.shape[:2]   #extracts the hight and width only not channel   
 
       ratio = width/w                               #Finds the ratio we'll use to resize
       new_width = int(w*ratio)  
@@ -26,7 +25,7 @@ def resize_image(img):      #returns numpy array
       resized = cv2.resize(img,(new_width,new_height)) #resizes the img
       return resized
 
-# --- Extracting Color Features --- #
+# --- Extracting Color Features --- 
 def extract_color_features(resized):  #returns hsv image
       hsv = cv2.cvtColor(resized, cv2.COLOR_BGR2HSV)  #Convert to HSV to ensure better comparison
       avg_hue = np.mean(hsv[:,:,0])                   #Calculate the average hue    
@@ -39,7 +38,7 @@ def extract_color_features(resized):  #returns hsv image
             "avg_value": avg_value  
       }
 
-# --- Healthy Thresholds --- #
+# --- Healthy Thresholds --- 
 
 def healthy_thresholds():     #returns dict     
 
@@ -66,7 +65,7 @@ def healthy_thresholds():     #returns dict
       return avg_healthy_features
 
 
-# --- Comparing Features --- #      
+# --- Comparing Features ---       
 
 def compare_features(healthy, test):   #returns dict 
       #calculates the difference between healthy and test images
@@ -77,30 +76,51 @@ def compare_features(healthy, test):   #returns dict
       }
 
 
-# --- Classifying Features --- #
+# --- Classifying Features --- 
 def classification(differences): #returns string(temporary)        
       if differences["hue_diff"] < -15:
             return "Possible Deficiency Type 2"       #Example classification based on color features (rough values)
       if differences["saturation_diff"] < -20:
-            return "Possible Deficiency Type 1"
+            return "Type 1 deficiency Detected"
       if differences["value_diff"] > 10:
-            return "Possible Deficiency Type 3"
+            return "Bacterial Infection Detected"
       return "Healthy"
-      
 
-# --- Testing the new functions --- #
+# --- Parsing Command Line Arguments --- 
+def parse_arguments():      #Used to parse command line arguments(extract file path for the image user wants to test)
+      parser = argparse.ArgumentParser(description="Plant Disease Detection based on Color Features")
 
-avg_healthy = healthy_thresholds()
-path = "samples\Tomato_Bacterial_spot_1.jpeg"
-test_img = load_image(path)
-test_resized = resize_image(test_img)
-test_features = extract_color_features(test_resized)
-differences = compare_features(avg_healthy, test_features)
+      parser.add_argument(
+            "--image",
+            type=str,
+            help="Path to the image to be tested",
+            required=True
+      )
+      args = parser.parse_args()    #parses the arguments
+      if not args.image and not args.folder:
+            parser.error("No action requested, add --image")  #if no arguments provided, show error
 
-print(differences)
+      return args
+
+
+# --- Main --- 
+def main():
+      path = parse_arguments().image
+      try:
+            test_img = load_image(path)
+      except FileNotFoundError:
+            print("Error: Image not found at path",path)
+            sys.exit(1)
+      test_resized = resize_image(test_img)
+      test_features = extract_color_features(test_resized)
+      healthy_features = healthy_thresholds()
+      differences = compare_features(healthy_features, test_features)
+      result = classification(differences)
+      print(result)
 
      
-
+if __name__ == "__main__":
+      main()
 
 
       
