@@ -38,6 +38,25 @@ def extract_color_features(resized):  #returns hsv image
             "avg_value": avg_value  
       }
 
+# --- Creating Mask ---
+
+def create_leaf_mask(img):
+
+      #using a green mask to remove background pixels and isolate the leaf region
+      #This is will remove noise and increase accuracy
+      
+      hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+      lower_green = np.array([20, 40, 20])   #lower bound for green in HSV
+      upper_green = np.array([120, 255, 255]) #upper bound for green in HSV
+
+      mask = cv2.inRange(hsv, lower_green, upper_green)  #creates the mask
+      mask = cv2.medianBlur(mask, 5)                            #applies a blur to remove some noise
+
+      masked_img = cv2.bitwise_and(img, img, mask=mask)  #applies the mask to the image 
+
+      return masked_img
+
 # --- Healthy Thresholds --- 
 
 def healthy_thresholds():     #returns dict     
@@ -51,10 +70,14 @@ def healthy_thresholds():     #returns dict
       healthy_resized1 = resize_image(healthy_img1)
       healthy_resized2 = resize_image(healthy_img2)   
       healthy_resized3 = resize_image(healthy_img3)
+      
+      healthy_masked1 = create_leaf_mask(healthy_resized1)
+      healthy_masked2 = create_leaf_mask(healthy_resized2)
+      healthy_masked3 = create_leaf_mask(healthy_resized3)
 
-      healthy_features1 = extract_color_features(healthy_resized1)
-      healthy_features2 = extract_color_features(healthy_resized2)
-      healthy_features3 = extract_color_features(healthy_resized3)
+      healthy_features1 = extract_color_features(healthy_masked1)
+      healthy_features2 = extract_color_features(healthy_masked2)
+      healthy_features3 = extract_color_features(healthy_masked3)
 
       avg_healthy_features = {
             "avg_hue": (healthy_features1["avg_hue"] + healthy_features2["avg_hue"] + healthy_features3["avg_hue"]) / 3,
@@ -76,15 +99,33 @@ def compare_features(healthy, test):   #returns dict
       }
 
 
-# --- Classifying Features --- 
-def classification(differences): #returns string(temporary)        
-      if differences["hue_diff"] < -15:
-            return "Possible Deficiency Type 2"       #Example classification based on color features (rough values)
-      if differences["saturation_diff"] < -20:
-            return "Type 1 deficiency Detected"
-      if differences["value_diff"] > 10:
-            return "Bacterial Infection Detected"
-      return "Healthy"
+# --- Classifying Features ---  
+def classification(differences):
+
+      hue_diff = differences["hue_diff"]
+      saturation_diff = differences["saturation_diff"]
+      value_diff = differences["value_diff"]
+
+      # Healthy
+      # Very small differences in all channels
+      if abs(hue_diff) < 6 and abs(saturation_diff) < 10 and abs(value_diff) < 5: #abs() used to get positive values                  
+            return "The plant appears to be healthy."
+
+      # Nitrogen Deficiency
+      # Pale yellow leaves → VERY low saturation & value, hue strongly negative
+      if saturation_diff < -40 and value_diff < -40 and hue_diff < -25:
+            return "The plant may have Nitrogen Deficiency (Pale yellow leaves detected)."
+
+      # Pottassium Deficiency
+      # Brown edges → low saturation, value moderately low, hue only mildly negative
+      if saturation_diff < -40 and value_diff < -10 and hue_diff >= -25:
+            return "The plant may have Potassium Deficiency."
+
+      # Anomaly
+      return "The plant condition is unclear, further analysis may be required (anomaly)."
+
+
+      
 
 # --- Parsing Command Line Arguments --- 
 def parse_arguments():      #Used to parse command line arguments(extract file path for the image user wants to test)
@@ -97,7 +138,7 @@ def parse_arguments():      #Used to parse command line arguments(extract file p
             required=True
       )
       args = parser.parse_args()    #parses the arguments
-      if not args.image and not args.folder:
+      if not args.image:
             parser.error("No action requested, add --image")  #if no arguments provided, show error
 
       return args
@@ -112,15 +153,25 @@ def main():
             print("Error: Image not found at path",path)
             sys.exit(1)
       test_resized = resize_image(test_img)
-      test_features = extract_color_features(test_resized)
+      test_masked = create_leaf_mask(test_resized)
+      test_features = extract_color_features(test_masked)
       healthy_features = healthy_thresholds()
       differences = compare_features(healthy_features, test_features)
+
+      print("Hue Difference:", differences["hue_diff"])
+      print("Saturation Difference:", differences["saturation_diff"])
+      print("Value Difference:", differences["value_diff"])
+      
       result = classification(differences)
+      
       print(result)
 
      
 if __name__ == "__main__":
       main()
+
+
+
 
 
       
